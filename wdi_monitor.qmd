@@ -1,0 +1,399 @@
+---
+title: "Monitoring for the World Development Indicators"
+format: 
+  dashboard:
+    nav-buttons: [github]
+    github: https://github.com/WB-DECIS/wdi_indicator_monitor
+logo: images/WB-DEC-Data-horizontal-white-gradient-high.png
+theme: [lumen, theme/custom.scss]
+fig-width: 10
+fig-asp: 0.3
+params:
+  database: "World Development Indicators"
+  unit: "DECDG"
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+
+library(tidyverse)
+library(readxl)
+library(scales)
+library(DT)
+library(gt)
+library(ggbeeswarm)
+library(plotly)
+theme_set(theme_minimal(base_size = 24, base_family = "Andes Bold"))
+```
+
+
+
+```{r}
+#| label: load-data
+#| message: false
+
+monitoring_data <- read_csv("data/wdic.csv")
+score_table <- read_csv("data/indicators_scoretable.csv")
+```
+
+
+
+```{r}
+#| label: set-inputs
+
+time_period <- paste(lubridate::month(Sys.Date(), label=TRUE), lubridate::year(Sys.Date()))
+```
+
+#  {.sidebar}
+
+This dashboard displays <br/> statistics for:
+
+|              |                              |
+|--------------|------------------------------|
+| **Database** | `{r} params$database`        |
+| **Unit**     | `{r} params$unit`            |
+| **Month**    | `{r} time_period`            |
+
+
+# All
+
+```{r}
+#| label: all-values
+#| results: hide
+
+#metadata count
+#count number of indicators failing on metadata
+metadata_count <- score_table %>% 
+  filter(metadata_fail != "No missing metadata") %>% 
+  nrow()
+
+#license count
+#count number of indicators failing on license
+license_count <- score_table %>% 
+  filter(License.Type != "CC BY-4.0") %>% 
+  nrow()
+
+# low user count
+#count number of indicators failing on user metrics
+user_count <- score_table %>% 
+  filter(visitors < 50) %>% 
+  nrow()
+
+# country count
+#count number of indicators failing on country coverage
+country_count <- score_table %>% 
+  filter(n_country < 50) %>% 
+  nrow()
+
+#time count
+#count number of indicators failing on time coverage
+time_count <- score_table %>% 
+  filter(yearlatest < (lubridate::year(Sys.Date())-10)) %>% 
+  nrow()
+
+#set thresholds for color scoring of indicator counts
+# 0 indicators is green
+# 0-100 indicators is yellow
+# more than 100 indicators is red
+metadata_color <- case_when(
+  between(metadata_count, 0, 100) ~ "warning",
+  metadata_count > 100 ~ "danger",
+  .default = "light"
+  )
+
+license_color <- case_when(
+  between(license_count, 0, 100) ~ "warning",
+  license_count > 100 ~ "danger",
+  .default = "light"
+  )
+
+user_color <- case_when(
+  between(user_count, 0, 100) ~ "warning",
+  user_count > 100 ~ "danger",
+  .default = "light"
+  )
+
+country_color <- case_when(
+  between(country_count, 0, 100) ~ "warning",
+  country_count > 100 ~ "danger",
+  .default = "light"
+  )
+
+time_color <- case_when(
+  between(time_count, 0, 100) ~ "warning",
+  time_count > 100 ~ "danger",
+  .default = "light"
+  )
+
+```
+
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Indicators Lacking Required Metadata"
+
+list(
+  icon = "file-earmark-check",
+  color = metadata_color,
+  value = metadata_count
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Indicators Lacking Open License"
+
+list(
+  icon = "cc-circle",
+  color = license_color,
+  value = license_count
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Indicators with Less than 50 unique Visitors"
+
+list(
+  icon = "file-earmark-arrow-down",
+  color = user_color,
+  value = user_count
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Indicators with Poor Country Coverage (under 50 countries)"
+
+list(
+  icon = "globe",
+  color = country_color,
+  value = country_count
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Indicators with No Data in Past 10 Years"
+
+list(
+  icon = "calendar-check",
+  color = time_color,
+  value = time_count
+)
+```
+
+## Row {height="70%"} {.tabset}
+
+
+```{r}
+#| title: Figure
+
+
+#beeswarm plot
+metric_nm <- 'hybrid_score_wgtd'
+metric_des <- "Weighted Distance to Threshold Score"
+
+breakup_tab_mod_df <- score_table %>% 
+  mutate(name_flag="WDI Indicators") %>%
+  rename('metric'= !!metric_nm) %>%
+  group_by(name_flag) %>%
+  summarise(metric_mn=mean(metric, na.rm=TRUE),
+            metric_min=min(metric, na.rm=TRUE),
+            metric_max=max(metric, na.rm=TRUE),
+            indicator_min=Indicator.Name[which.min(metric)],
+            indicator_max=Indicator.Name[which.max(metric)],
+            ) %>%
+  #arrange(-metric_mn) %>%
+  transmute(
+    name_flag=name_flag,
+    metric=round(metric_mn,2),
+    min=round(metric_min,2),
+    indicator_min=indicator_min,
+    max=round(metric_max,2),
+    indicator_max=indicator_max
+  ) 
+
+p <- score_table %>% 
+  mutate(name_flag="WDI Indicators") %>%
+  rename('metric'= !!metric_nm) %>%
+  mutate(name_flag=factor(name_flag, levels=breakup_tab_mod_df$name_flag)) %>%
+  ggplot(aes(x=name_flag, y=metric, group=Indicator.Name)) +
+    geom_beeswarm(color='#457b9d', alpha=0.5) +
+    geom_segment(data=breakup_tab_mod_df, aes( xend=after_stat(x)+.3, yend=after_stat(y), group=""), color='black', size=1)  +
+    geom_segment(data=breakup_tab_mod_df, aes( xend=after_stat(x)-.3, yend=after_stat(y), group=""), color='black', size=1)  +
+    geom_text(data=breakup_tab_mod_df, aes(label=paste0("Mean: ",round(metric, 1)), group=""), vjust=-2.5, hjust=1.5, color='black', size=4) +
+    theme_bw() +
+    expand_limits(y=c(0,4)) +
+    xlab('Status') +
+    ylab(metric_des) +
+    coord_flip() +
+      labs(title='Indicator Scores for New Indicators & WDI Indicators',
+
+                   caption='Black lines represent the mean by status.')
+
+ggplotly(p)
+
+```
+
+```{r scoretab}
+#| title: Table
+ score_table %>%
+    select(Indicator.Code, Indicator.Name, hybrid_score_wgtd, n_country, p_lmic, yearlatest_median, yearlatest, nonmiss, 
+           span_years, uniquevisitors,metadata_availability, metadata_length,  datatopic) %>%
+      arrange(hybrid_score_wgtd) %>%
+      DT::datatable(
+               rownames=FALSE,
+               colnames = c("", "Indicator", "Weighted Distance to Threshold Score",  "No. Countries", 'LMIC Coverage (%)', 'Last Year (Median)', 
+                            'Last Year (Max)', 'Share of non-missing data', 'No. Years Spanned','Unique visitors', "Metadata Availability", 
+                            "Metadata Length", 'Topic'),
+               class='cell-border stripe',
+               escape = FALSE,
+               extensions = c ('Buttons', 'FixedHeader'), 
+               options=list(
+                 dom = 'Bfrtip',
+                 #paging = FALSE,
+                 buttons = c('copy', 'csv', 'excel'),
+                 scroller = T,
+                 scrollX = T,
+                 scrollY = T
+                 ),
+                 callback=JS("table.on( 'order.dt search.dt', function () {
+                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                                      cell.innerHTML = i+1;});}).draw();")
+               ) %>%
+   formatRound(columns=c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'), digits=2) 
+```
+
+
+
+# Metadata
+
+# License
+
+# User Metrics
+
+# Country Coverage
+
+# Time Coverage
+
+# Quantitative Scoring
+
+To quantify the quality of a WDI database indicator, we have created some metrics that help us understand the temporal coverage, geographical coverage, completeness, and usage of the indicator. We have created the following metrics:
+
+<b>Geographical coverage:  </b>
+
+  a. **Number of economies** (n\_country): This metric measures the total number of economies for which data is available for the indicator.    
+  b. **Share of low- and middle-income economies** (p\_lmic): This metric measures the percent of low- and middle-income economies for which data is available. We use the total number of LMICs as of today as the denominator.
+  
+ <b>Temporal coverage:  </b>
+ 
+  a. **Absolute latest year** (yearlatest): This metric measures the most recent year of data available for an indicator.    
+  c. **Median latest year** (yearleatest\_median): This metric takes the most recent year of data available for each country for the indicator and then calculate the median.   
+  d. **Span of years** (span\_years): This metric measures the total number of years for which data is available for this indicator. We take the first year data and latest year for which any data is available and calculating the span between these years.
+
+ <b>Completeness:  </b> 
+
+  a. **Non-missing data:** This metric measures the share of non-missing data within its availability. The span is restricted to the indicator span and country coverage previously calculated, and not the span and coverage of the WDI.
+
+
+<b>Usage:   </b>
+
+  a. **Unique visitors:** This metric measures the number of unique visitors in one year which is calculated using the API for the Adobe Analytics platform.
+
+<b>Metadata: </b>
+
+  a. **Key Availability** This indicator checks that key metadata fields are available for the indicator, specifically fields on development relevance, methodology, license, definition, and source.  This is done by checking for the availability of at least one word in each of these fields.  The metric is between 0-5, with 1 point awarded for each field that has content available.
+  b. **Length** This metric is a word count for an indicator across all metadata fields.  This includes development relevance, licenses, methodology, definition, source, comments, notes, and limitation.
+
+These 9 metrics has been used to calculate scores for each indicator by two different methods. The following describes the two types of scoring methods:
+
+<b> Distance to frontier scoring </b>
+
+This approach takes the &#39;best case&#39; scenario and &#39;worst case&#39; scenario for each indicator, and calculates the distance of the actual value between the best and worst case. This is done by creating a percentage for each indicator.
+
+For example, for &#39;Latest year&#39;, the best case value is 2020 and the worst case value is 2008, then if the indicator has a value of 2016, then the score for this indicator will be 2016-2008/2020-2008\*100 = 66.67%.
+
+Such a percentage is calculated for every indicator except for Unique visitors. For Unique visitors, a percentile is generated as there is no &#39;best case&#39; scenario that is independent of the distribution.
+
+After getting a score out of 100 for each metric, it is summed up and divided by the number of metrics i.e. seven, to get a total score out of 100.
+
+<b> Threshold scoring </b>
+
+In this approach, a score is produced for each indicator based on whether it passes certain thresholds in each metric. Three thresholds are defined for each metric, which are named the &quot;Loose&quot;, &quot;Median&quot;, and &quot;Stringent&quot; scenarios. The &quot;Loose&quot; scenario is the easiest for an indicator to pass. For instance for the &quot;Number of economies&quot; metric, it requires that the indicator have data for at least 35 economies. The &quot;Median&quot; scenario is more difficult to pass. On the &quot;Number of economies&quot; metric, for instance, it requires that the indicator to have data for at least 50 economies. The &quot;Stringent&quot; scenario is the most difficult for an indicator to pass, requiring, as an example, at least 65 countries with data for the &quot;Number of economies&quot; metric. The thresholds were defined by the WDI criteria team based on looking for natural cuts in the data for each metric and based on internal team discussion on reasonable standards.
+
+
+Table. Thresholds for Classifications in Tiers to Flag Poorly Performing Indicators as of 2024. 
+ 
+| Metric                                        | **Lowest Tier** | **4th Tier** | **3rd Tier** | **2nd Tier** | **Top Tier**|
+| --------------------------------------------- | ------- | --------- | ---------- | ------------- | ------- |
+| **Number of economies**                       | 30      | 50        | 80         | 100           | 180     |
+| **Share of low- and middle-income economies** | 10      | 30        | 40         | 65            | 90      |
+| **Span of years**                             | 3       | 6         | 10         | 15            | 50      |
+| **Absolute latest year**                      | 2012    | 2013      | 2015       | 2016          | 2019    |
+| **Median latest year**                        | 2010    | 2012      | 2012       | 2015          | 2019    |
+| **Non-missing data**                          | 8       | 10        | 12         | 15            | 60      |
+| **Unique visitors**                           | 50      | 65        | 120        | 200           | 2000    |
+| **Metadata Availability**                     | 1       | 2         | 3          | 4             | 5       |
+| **Metadata Word Length**                      | 50      | 100       | 150        | 200           | 500     |
+
+
+To produce an overall score for each indicator based on this approach, the following methodology was followed. For each metric, a score of 0-4 was produced based on the following scoring:
+
+- 1 point: metric value falls below the &quot;4th Tier&quot; scenario threshold
+- 2 points: metric value falls between the &quot;4th Tier&quot; and &quot;3rd Tier&quot; threshold
+- 3 points: metric value falls between the &quot;3rd Tier&quot; and &quot;2nd Tier&quot; threshold
+- 4 points: metric value above the &quot;2nd Tier&quot; threshold.
+
+The result of this scoring is that each indicator has a 1-4 score along all 9 of the scoring metrics (Number of economies, Share of low- and middle-income economies, Absolute latest year, Median latest year, Span of years, Non-missing data, Unique visitors, metadata availability, metadata length). 
+
+An overall score is then computed by taking the weighted average the scores across the 9 metrics with higher scores meaning the indicator performs better on average across the nine metrics. The scores are produced using the nested structure described above with five categories: Geographic Coverage, Temporal Coverage, Completeness, Usage. The weights are 1/5 to indicators grouped in the Geographic Coverage category, 1/5 to Temporal Coverage, 1/5 to Completeness, 1/5 to Usage, and 1/5 to metadata quality. Within each category, the category scores are produced taking the unweighted average of metrics in that category.
+
+<b> Distance to Threshold Scoring Approach </b>
+
+A third approach to scoring combines some aspects of the distance to frontier scoring method and the threshold scoring method. As with the threshold scoring method, a set of loose, median, and stringent scenarios are used to score the indicators.
+
+A flaw with the threshold scoring approach is that the discrete scoring on the 1-4 scale resulted in many tied scores for indicators. The Distance to Threshold approach rectifies this flaw by extending the discrete 1-4 scale to a continuous scale between 0 and 4. It does so by incorporating some of the elements of the distance to frontier method, where upper limits and lower limits are set based on each scenario (loose, median, stringent) and an indicator is scored by its distance between the upper and lower limit.
+
+Additionally, two new categories are added: &quot;Low&quot; and &quot;High&quot;, which help smooth the distribution of scores below the &quot;Loose&quot; and above the &quot;Stringent&quot; scenarios. Indicators scoring below the &quot;Low&quot; are automatically given the lower possible score &#39;0&#39;, which indicators scoring above the &quot;High&quot; are automatically given the highest possible score &#39;4&#39;. The &quot;Low&quot; and &quot;High&quot; categories help account for outliers in the distribution of the metrics that may impact the scoring. To give a specific example, on unique visitors, suppose there is an indicator that receives over a million unique visitors in a year. In fact, the indicator &quot;GDP growth (annual %)&quot; does receive this total in a year. If a &quot;High&quot; category was not set, then this outlier would cause a large amount of bunching of scores for all indicators above the &quot;Stringent&quot; group, as the vast majority of indicators are very far from this indicator with 1 million visits. Therefore, a High category is introduced, where any indicator scoring above this limit will automatically receive 4 points, and indicators under this High will not see as much bunching due to the outlier observation.
+
+
+
+For each metric, a score of 0-4 was produced based on the following scoring. First some notation. Let $\alpha_l$ be the lower limit and $\alpha_u$ be the upper limit. Also let $\gamma$  be the value of a metric (for instance the number of countries). Then the scores are the following:
+
+- Metric value falls below the &quot;Low&quot; scenario threshold
+  - Lower limit : Low possible value for any indicator
+  - Upper limit : value of the &quot;Low&quot; scenario
+  - Score: 0
+- Metric value falls below the &quot;Loose&quot; scenario threshold and above &quot;Low&quot;
+  - Lower limit : value of the &quot;Low&quot; scenario
+  - Upper limit : value of the &quot;Loose&quot; scenario
+  - Score: $(\gamma-\alpha_l)/(\alpha_u - \alpha_l)$
+- Metric value falls between the &quot;Loose&quot; and &quot;Median&quot; threshold
+  - Lower limit : value of the &quot;Loose&quot; scenario
+  - Upper limit : value of the &quot;Median&quot; scenario
+  - Score: 1+$(\gamma-\alpha_l)/(\alpha_u - \alpha_l)$
+- Metric value falls between the &quot;Median&quot; and &quot;Stringent&quot; threshold
+  - Lower limit : value of the &quot;Median&quot; scenario
+  - Upper limit : value of the &quot;Stringent&quot; scenario
+  - Score: 2+$(\gamma-\alpha_l)/(\alpha_u - \alpha_l)$
+- Metric value above the &quot;Stringent&quot; but below &quot;High&quot; threshold.
+  - Lower limit : value of the &quot;Stringent&quot; scenario
+  - Upper limit : value of the &quot;High&quot; scenario
+  - Score: 3 +$(\gamma-\alpha_l)/(\alpha_u - \alpha_l)$
+- Metric value falls above the &quot;High&quot; scenario threshold
+  - Lower limit : value of the &quot;High&quot; scenario
+  - Upper limit : Maximum possible value for any indicator
+  - Score: 4
+
+The score for indicator on a specific metric (say number of countries) is the distance from the lower limit divided by the total distance between the upper and lower limit plus a constant. The constant distinguishes between different thresholds. Note that the value for is always between 0 and 1 and that indicators with metrics closer to the upper limit are closer to 1 and thus receive higher scores. This scoring system results in continuous scale between 0 and 4.
+
+To give a specific example based on the number of countries criteria, an indicator with data for 21 countries would receive a score of $(21-20)/(35-20)=0.067$. An indicator with data for 45 countries would receive a score of $1+(45-35)/(50-35)=1.667$. An indicator with data for 200 countries would receive a score of $3+(190-65)/(200-65)=3.93$
+
+The result of this scoring is that each indicator has a 0-4 score along all 9 of the scoring metrics (Number of economies, Share of low- and middle-income economies, Absolute latest year, Median latest year, Span of years, Non-missing data, Unique visitors, metadata availability, metadata length). 
+
+An overall score is then computed by taking the weighted average the scores across the 9 metrics with higher scores meaning the indicator performs better on average across the nine metrics. The scores are produced using the nested structure described above with five categories: Geographic Coverage, Temporal Coverage, Completeness, Usage. The weights are 1/5 to indicators grouped in the Geographic Coverage category, 1/5 to Temporal Coverage, 1/5 to Completeness, 1/5 to Usage, and 1/5 to metadata quality. Within each category, the category scores are produced taking the unweighted average of metrics in that category.
+
