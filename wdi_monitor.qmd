@@ -2,6 +2,7 @@
 title: "Monitoring for the World Development Indicators"
 format: 
   dashboard:
+    scrolling: true
     nav-buttons: [github]
     github: https://github.com/WB-DECIS/wdi_indicator_monitor
 logo: images/WB-DEC-Data-horizontal-white-gradient-high.png
@@ -24,6 +25,7 @@ library(DT)
 library(gt)
 library(ggbeeswarm)
 library(plotly)
+
 theme_set(theme_minimal(base_size = 24, base_family = "Andes Bold"))
 ```
 
@@ -43,6 +45,17 @@ score_table <- read_csv("data/indicators_scoretable.csv")
 #| label: set-inputs
 
 time_period <- paste(lubridate::month(Sys.Date(), label=TRUE), lubridate::year(Sys.Date()))
+
+#extract number of indicators
+n_indicators <- monitoring_data %>% 
+  nrow()
+
+#extract number of years
+min_year <- min(monitoring_data$yearfirst)
+max_year <- max(monitoring_data$yearlatest)
+
+#extract number of countries
+n_countries <- max(monitoring_data$n_country)
 ```
 
 #  {.sidebar}
@@ -54,6 +67,15 @@ This dashboard displays <br/> statistics for:
 | **Database** | `{r} params$database`        |
 | **Unit**     | `{r} params$unit`            |
 | **Month**    | `{r} time_period`            |
+
+<h3> WDI Summary  </h3>
+
+|              |                              |
+|--------------|------------------------------|
+| **Indicators** | `{r} scales::comma(n_indicators)` |
+| **Years** | `{r} paste0(min_year, " - ", max_year)` |
+| **Countries** | `{r} n_countries` |
+
 
 
 # All
@@ -129,11 +151,11 @@ time_color <- case_when(
 ```
 
 
-## Row {height="20%"}
+## Row {height="35%"}
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators Lacking Required Metadata"
+#| title: "Indicators lacking required metadata"
 
 list(
   icon = "file-earmark-check",
@@ -144,7 +166,7 @@ list(
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators Lacking Open License"
+#| title: "Indicators lacking open license"
 
 list(
   icon = "cc-circle",
@@ -155,7 +177,7 @@ list(
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators with Less than 50 unique Visitors last 12 months"
+#| title: "Indicators with less than 50 visitors last 12 months"
 
 list(
   icon = "file-earmark-arrow-down",
@@ -166,7 +188,7 @@ list(
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators with Poor Country Coverage (under 50 countries)"
+#| title: "Indicators with poor country coverage (under 50 countries)"
 
 list(
   icon = "globe",
@@ -177,7 +199,7 @@ list(
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators with No Data in Past 10 Years"
+#| title: "Indicators with no data in last 10 years"
 
 list(
   icon = "calendar-check",
@@ -186,7 +208,7 @@ list(
 )
 ```
 
-## Row {height="70%"} {.tabset}
+## Row {.tabset}
 
 
 ```{r}
@@ -195,7 +217,7 @@ list(
 
 #beeswarm plot
 metric_nm <- 'hybrid_score_wgtd'
-metric_des <- "Weighted Distance to Threshold Score"
+metric_des <- "WDI Scoring Metric"
 
 breakup_tab_mod_df <- score_table %>% 
   mutate(name_flag="WDI Indicators") %>%
@@ -231,7 +253,7 @@ p <- score_table %>%
     xlab('Status') +
     ylab(metric_des) +
     coord_flip() +
-      labs(title='Indicator Scores for New Indicators & WDI Indicators',
+      labs(title='Indicator Scores for WDI Indicators',
 
                    caption='Black lines represent the mean by status.')
 
@@ -247,23 +269,16 @@ ggplotly(p)
       arrange(hybrid_score_wgtd) %>%
       DT::datatable(
                rownames=FALSE,
-               colnames = c("", "Indicator", "Weighted Distance to Threshold Score",  "No. Countries", 'LMIC Coverage (%)', 'Last Year (Median)', 
+               colnames = c("", "Indicator", "WDI Scoring Metric",  "No. Countries", 'LMIC Coverage (%)', 'Last Year (Median)', 
                             'Last Year (Max)', 'Share of non-missing data', 'No. Years Spanned','Unique visitors', "Metadata Availability", 
                             "Metadata Length", "License", 'Topic'),
                class='cell-border stripe',
-               escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
+                 )
                ) %>%
    formatRound(columns=c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'), digits=2) 
 ```
@@ -288,12 +303,9 @@ To help users understand the data, a set of key metadata fields need to be in pl
                escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
                  ),
                  callback=JS("table.on( 'order.dt search.dt', function () {
                                 table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
@@ -318,12 +330,9 @@ Data should be open and free to use. The World Bank has adopted the Creative Com
                escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
                  ),
                  callback=JS("table.on( 'order.dt search.dt', function () {
                                 table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
@@ -348,12 +357,9 @@ score_table %>%
                escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
                  ),
                  callback=JS("table.on( 'order.dt search.dt', function () {
                                 table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
@@ -379,12 +385,9 @@ The number of countries for which data is available is a key metric to understan
                escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
                  ),
                  callback=JS("table.on( 'order.dt search.dt', function () {
                                 table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
@@ -411,12 +414,9 @@ An indicator should have recent data available and the indicator should ideally 
                escape = FALSE,
                extensions = c ('Buttons', 'FixedHeader'), 
                options=list(
-                 dom = 'Bfrtip',
-                 #paging = FALSE,
-                 buttons = c('copy', 'csv', 'excel'),
-                 scroller = T,
-                 scrollX = T,
-                 scrollY = T
+                 dom = 'Bftsp',
+                 paging = TRUE,
+                 buttons = c('copy', 'csv', 'excel')
                  ),
                  callback=JS("table.on( 'order.dt search.dt', function () {
                                 table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
@@ -437,10 +437,7 @@ To quantify the quality of a WDI database indicator, we have created some metric
   a. **Absolute latest year** (yearlatest): This metric measures the most recent year of data available for an indicator.    
   c. **Median latest year** (yearleatest\_median): This metric takes the most recent year of data available for each country for the indicator and then calculate the median.   
   d. **Span of years** (span\_years): This metric measures the total number of years for which data is available for this indicator. We take the first year data and latest year for which any data is available and calculating the span between these years.
-
- <b>Completeness:  </b> 
-
-  a. **Non-missing data:** This metric measures the share of non-missing data within its availability. The span is restricted to the indicator span and country coverage previously calculated, and not the span and coverage of the WDI.
+  e. **Non-missing data:** This metric measures the share of non-missing data within its availability. The span is restricted to the indicator span and country coverage previously calculated, and not the span and coverage of the WDI.
 
 
 <b>Usage:   </b>
@@ -497,7 +494,7 @@ An overall score is then computed by taking the weighted average the scores acro
 
 <b> Distance to Threshold Scoring Approach </b>
 
-A third approach to scoring combines some aspects of the distance to frontier scoring method and the threshold scoring method. As with the threshold scoring method, a set of loose, median, and stringent scenarios are used to score the indicators.
+A third approach to scoring combines some aspects of the distance to frontier scoring method and the threshold scoring method. As with the threshold scoring method, a set of loose, median, and stringent scenarios are used to score the indicators. This is the approach displayed in the figure on the main page.
 
 A flaw with the threshold scoring approach is that the discrete scoring on the 1-4 scale resulted in many tied scores for indicators. The Distance to Threshold approach rectifies this flaw by extending the discrete 1-4 scale to a continuous scale between 0 and 4. It does so by incorporating some of the elements of the distance to frontier method, where upper limits and lower limits are set based on each scenario (loose, median, stringent) and an indicator is scored by its distance between the upper and lower limit.
 

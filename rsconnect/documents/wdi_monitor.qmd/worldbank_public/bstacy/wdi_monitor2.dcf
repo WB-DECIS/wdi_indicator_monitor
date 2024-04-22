@@ -1,0 +1,12 @@
+name: wdi_monitor2
+title: wdi_monitor
+username: bstacy
+account: bstacy
+server: worldbank_public
+hostUrl: http://w0lxopshyprd1b.worldbank.org:3939/__api__
+appId: 1406
+bundleId: 50278
+url: http://w0lxopshyprd1b.worldbank.org:3939/WDI_Monitoring_Dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: TRUE
