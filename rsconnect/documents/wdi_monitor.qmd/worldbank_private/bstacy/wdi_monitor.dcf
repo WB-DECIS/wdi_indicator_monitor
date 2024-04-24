@@ -5,10 +5,8 @@ account: bstacy
 server: worldbank_private
 hostUrl: http://w0lxprconn01.worldbank.org:3939/__api__
 appId: 1468
-bundleId: 10610
-url: http://w0lxprconn01.worldbank.org:3939/content/3c16c52a-f5fe-4411-b931-22f8c729a0dc/
+bundleId: 10641
+url: http://w0lxprconn01.worldbank.org:3939/WDI_monitoring_dashboard/
 version: 1
-quarto_version: 1.4.550
-quarto_engines: knitr
 asMultiple: FALSE
-asStatic: FALSE
+asStatic: TRUE

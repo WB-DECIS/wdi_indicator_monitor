@@ -1,17 +1,21 @@
 ---
 title: "Monitoring for the World Development Indicators"
-format: 
+format:
   dashboard:
     scrolling: true
-    nav-buttons: [github]
-    github: https://github.com/WB-DECIS/wdi_indicator_monitor
-logo: images/WB-DEC-Data-horizontal-white-gradient-high.png
-theme: [lumen, theme/custom.scss]
+    nav-buttons: github
+    github: "https://github.com/WB-DECIS/wdi_indicator_monitor"
+logo: "images/WB-DEC-Data-horizontal-white-gradient-high.png"
+theme:
+- lumen
+- theme/custom.scss
 fig-width: 10
 fig-asp: 0.3
 params:
-  database: "World Development Indicators"
-  unit: "DECDG"
+  database: World Development Indicators
+  unit: DECDG
+resource_files:
+- manifest.json
 ---
 
 ```{r}
@@ -25,6 +29,7 @@ library(DT)
 library(gt)
 library(ggbeeswarm)
 library(plotly)
+library(downloadthis)
 
 theme_set(theme_minimal(base_size = 24, base_family = "Andes Bold"))
 ```
@@ -76,6 +81,20 @@ This dashboard displays <br/> statistics for:
 | **Years** | `{r} paste0(min_year, " - ", max_year)` |
 | **Countries** | `{r} n_countries` |
 
+<h3> Download the Data </h3>
+
+```{r}
+#download the data
+score_table %>%
+  download_this(
+    output_name = "WDI Monitoring data set",
+    output_extension = ".xlsx",
+    button_label = "Download data",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
+```
 
 
 # All
@@ -151,7 +170,7 @@ time_color <- case_when(
 ```
 
 
-## Row {height="35%"}
+## Row {height="350px}
 
 ```{r}
 #| content: valuebox
@@ -208,7 +227,7 @@ list(
 )
 ```
 
-## Row {.tabset}
+## Row {.tabset height="65%"}
 
 
 ```{r}
@@ -261,28 +280,68 @@ ggplotly(p)
 
 ```
 
-```{r scoretab}
+
+
+
+```{r}
 #| title: Table
+#conver to a table using the gt package
  score_table %>%
     select(Indicator.Code, Indicator.Name, hybrid_score_wgtd, n_country, p_lmic, yearlatest_median, yearlatest, nonmiss, 
            span_years, uniquevisitors,metadata_availability, metadata_length, License.Type,  datatopic) %>%
       arrange(hybrid_score_wgtd) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "WDI Scoring Metric",  "No. Countries", 'LMIC Coverage (%)', 'Last Year (Median)', 
-                            'Last Year (Max)', 'Share of non-missing data', 'No. Years Spanned','Unique visitors', "Metadata Availability", 
-                            "Metadata Length", "License", 'Topic'),
-               class='cell-border stripe',
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 )
-               ) %>%
-   formatRound(columns=c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'), digits=2) 
+  gt() %>%
+  tab_header(
+    title = "Indicator Overview",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_number(
+    columns = c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'),
+    decimals = 2
+  ) %>%
+  fmt_date(
+    columns = c('yearlatest_median', 'yearlatest'),
+  ) %>%
+  fmt_number(
+    columns = c('span_years', 'uniquevisitors'),
+    use_seps = TRUE
+  ) %>%
+  #add span
+  tab_spanner(
+    label = "Metadata",
+    columns = c('metadata_availability', 'metadata_length')
+  ) %>%
+  tab_spanner(
+    label = "Time",
+    columns = c('yearlatest_median', 'yearlatest', 'span_years', 'nonmiss')
+  ) %>%
+  tab_spanner(
+    label = "Country",
+    columns = c('n_country', 'p_lmic')
+  ) %>%
+  #rename columns
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    hybrid_score_wgtd = "Score",
+    n_country = "Countries",
+    p_lmic = "LMIC (%)",
+    yearlatest_median = "Latest Year (Median)",
+    yearlatest = "Latest Year (Max)",
+    nonmiss = "Non-missing data (%)",
+    span_years = "Years Spanned",
+    uniquevisitors = "Unique visitors",
+    metadata_availability = "Metadata Availability",
+    metadata_length = "Metadata Length",
+    License.Type = "License",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
 ```
-
 
 
 # Metadata
@@ -295,22 +354,35 @@ To help users understand the data, a set of key metadata fields need to be in pl
  score_table %>%
     select(Indicator.Code, Indicator.Name, metadata_fail, metadata_length, Development.relevance, Statistical.concept.and.methodology, License.Type, Short.definition, Long.definition, Source,  datatopic) %>%
       arrange(metadata_length) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "Metadata Availability", 
-                            "Metadata Word Count Length", "Development Relevance", "Statistical Concept and Methodology", "License", "Short Definition", "Long Definition", "Source", 'Topic'),
-               class='cell-border stripe',
-               escape = FALSE,
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
-               ) 
+  gt() %>%
+  tab_header(
+    title = "Metadata Overview",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_number(
+    columns = c('metadata_length'),
+    decimals = 0
+  ) %>%
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    metadata_fail = "Metadata Availability",
+    metadata_length = "Metadata Length",
+    Development.relevance = "Development Relevance",
+    Statistical.concept.and.methodology = "Statistical Concept and Methodology",
+    License.Type = "License",
+    Short.definition = "Short Definition",
+    Long.definition = "Long Definition",
+    Source = "Source",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+
+
 ```
 
 
@@ -323,21 +395,25 @@ Data should be open and free to use. The World Bank has adopted the Creative Com
  score_table %>%
     select(Indicator.Code, Indicator.Name,  License.Type, Source,  datatopic) %>%
       arrange(License.Type) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "License",  "Source", 'Topic'),
-               class='cell-border stripe',
-               escape = FALSE,
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
-               ) 
+  gt() %>%
+  tab_header(
+    title = "License Overview",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    License.Type = "License",
+    Source = "Source",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+    
+    
 ```
 
 # User Metrics
@@ -350,21 +426,28 @@ The number of unique visitors to an indicator is a key metric to understand the 
 score_table %>%
     select(Indicator.Code, Indicator.Name, uniquevisitors, pageviews, datatopic) %>%
       arrange(desc(uniquevisitors)) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "Unique Visitors", "Page Views", 'Topic'),
-               class='cell-border stripe',
-               escape = FALSE,
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
-               ) 
+  gt() %>%
+  tab_header(
+    title = "User Metrics",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_number(
+    columns = c('uniquevisitors', 'pageviews'),
+    use_seps = TRUE
+  ) %>%
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    uniquevisitors = "Unique Visitors",
+    pageviews = "Page Views",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+  
 ```
 
 # Country Coverage
@@ -378,21 +461,29 @@ The number of countries for which data is available is a key metric to understan
  score_table %>%
     select(Indicator.Code, Indicator.Name,  n_country, n_lmic, p_lmic,  datatopic) %>%
       arrange(desc(n_country)) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "Number of Countries", "Number of Low/Midlde Income (LMIC) Countries", "Percent of LMICs", 'Topic'),
-               class='cell-border stripe',
-               escape = FALSE,
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
-               ) 
+  gt() %>%
+  tab_header(
+    title = "Country Coverage",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_number(
+    columns = c('n_country', 'n_lmic', 'p_lmic'),
+    decimals = 0
+  ) %>%
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    n_country = "Number of Countries",
+    n_lmic = "Number of LMICs",
+    p_lmic = "Percent of LMICs",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+  
 ```
 
 # Time Coverage
@@ -407,21 +498,30 @@ An indicator should have recent data available and the indicator should ideally 
  score_table %>%
     select(Indicator.Code, Indicator.Name,  yearlatest, yearlatest_median, span_years, nonmiss,  datatopic) %>%
       arrange(desc(yearlatest)) %>%
-      DT::datatable(
-               rownames=FALSE,
-               colnames = c("", "Indicator", "Latest Year", "Median Latest Year", "Span of Years", "Share of Non-missing Data", 'Topic'),
-               class='cell-border stripe',
-               escape = FALSE,
-               extensions = c ('Buttons', 'FixedHeader'), 
-               options=list(
-                 dom = 'Bftsp',
-                 paging = TRUE,
-                 buttons = c('copy', 'csv', 'excel')
-                 ),
-                 callback=JS("table.on( 'order.dt search.dt', function () {
-                                table.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
-                                      cell.innerHTML = i+1;});}).draw();")
-               ) 
+  gt() %>%
+  tab_header(
+    title = "Time Coverage",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_date(
+    columns = c('yearlatest', 'yearlatest_median', 'span_years', 'nonmiss')
+  ) %>%
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    yearlatest = "Latest Year",
+    yearlatest_median = "Median Latest Year",
+    span_years = "Span of Years",
+    nonmiss = "Share of Non-missing Data",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+    
+    
 ```
 # Quantitative Scoring
 
