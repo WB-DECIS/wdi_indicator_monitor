@@ -1,0 +1,14 @@
+name: wdi_monitoring_dashboard
+title: WDI Monitoring Dashboard
+username: bstacy
+account: bstacy
+server: w0lxdrconn01.worldbank.org
+hostUrl: https://w0lxdrconn01.worldbank.org/__api__
+appId: 188
+bundleId:
+url: https://w0lxdrconn01.worldbank.org/content/fffaad0d-a9bf-480e-8584-7614dce230ac/
+version: 1
+quarto_version: 1.4.550
+quarto_engines: knitr
+asMultiple: FALSE
+asStatic: FALSE

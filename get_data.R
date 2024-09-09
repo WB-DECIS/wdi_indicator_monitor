@@ -23,14 +23,14 @@ current_year <- year(current_date)
 # and update WDI file again.
 # Change working directory to where you want to download WDI.
 
-url <- "http://databank.worldbank.org/data/download/WDI_csv.zip"
+url <- "https://databank.worldbank.org/data/download/WDI_CSV.zip"
 username <- Sys.info()["user"]
 
-destfile <- file.path(paste0("C:/Users/", username, "/Downloads","wdi.zip"))
+destfile <- file.path(paste0("C:/Users/", username, "/Downloads/","wdi.zip"))
 download.file(url, destfile)
 
 #### CLEAN DATA ####
-data <- read.table(unz(destfile, "WDIData.csv"),header=T, quote="\"", sep=",")
+data <- read.table(unz(destfile, "WDICSV.csv"),header=T, quote="\"", sep=",")
 topics <- read.table(unz(destfile, "WDISeries.csv"),header=T, quote="\"", sep=",") 
 countrymeta <- read.table(unz(destfile, "WDICountry.csv"),header=T, quote="\"", sep=",")
 seriesmeta <- read.table(unz(destfile, "WDISeries.csv"),header=T, quote="\"", sep=",")

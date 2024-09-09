@@ -1,0 +1,236 @@
+---
+title: "Monitoring for the World Development Indicators"
+format: 
+  docx:
+    reference-doc: custom-reference-doc.docx
+    number-sections: false
+execute:
+  echo: false
+  warning: false
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+
+library(tidyverse)
+library(readxl)
+library(scales)
+library(DT)
+library(gt)
+library(ggbeeswarm)
+library(gtsummary)
+library(flextable)
+
+theme_set(theme_minimal(base_size = 24, base_family = "Andes Bold"))
+```
+
+
+# Introduction
+
+The World Development Indicators (WDI) is the World Bank's premier compilation of cross-country data on global development. As a crucial input into research, analysis and policy formulation, it is imperative that the WDI maintains high standards of data quality, relevance and accessibility. This short document applies a set of  quantitative criteria used to evaluate potential indicators for inclusion in the WDI. A WDI criteria framework, adapted from Jolliffe et al. (2023), covers four key areas - ease of use, trustworthiness and relevance, adequate coverage, and high quality. Within each area, specific dimensions are defined to comprehensively assess whether an indicator meets the stringent requirements of the WDI (Table 1). 
+```{r}
+#| label: load-data
+#| message: false
+
+monitoring_data <- read_csv("data/wdic.csv")
+score_table <- read_csv("data/indicators_scoretable.csv")
+```
+
+Table 1: Framework for Indicator Selection in the WDI. Modified from Jolliffe et al. (2023)
+
+| Area              | Dimension                  | Definition                                                                                                                                                                                                 |
+|-------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Easy to Use       | Accessible                 | Data is machine-readable and available to intended users with an open license.                                                                                                                             |
+|                   | Understandable             | Data has clear metadata.                                                                                                                                                                                   |
+|                   | Interoperable              | Data can be linked to other sources through common identifiers and standards.                                                                                                                              |
+| Trusted & Relevant| Impartial                  | Data is immune to influence from stakeholders that could alter or censor it.                                                                                                                               |
+|                   | Confidentiality Protected  | Personal and sensitive information is protected.                                                                                                                                                           |
+|                   | Development Relevance      | Data that aligns with and supports internationally adopted development goals, priorities, and frameworks like the Sustainable Development Goals (SDGs), the World Bank's mission and strategies, climate agreements, etc. |
+| Adequate Coverage | Complete                   | Data represents the entire population of interest, geographically or otherwise.                                                                                                                            |
+|                   | Frequent                   | Data is produced at regular, desired intervals based on the temporal dynamics of the outcome.                                                                                                              |
+|                   | Timely                     | Data is released shortly after collection or occurrence of an event.                                                                                                                                       |
+| High Quality      | Accurate                   | Data measures intended concepts with minimal error, both in terms of variance and bias.                                                                                                                     |
+|                   | Comparable                 | Data conforms to standards and is comparable across space and time.                                                                                                                                        |
+|                   | Granular                   | Data can be broken down into relevant subgroups like geography, time, sex, etc.                                                                                                                            |
+
+While this conceptual framework provides the guiding principles, a set of quantitative metrics allows for rigorous benchmarking of indicators against observable criteria related to data coverage, timeliness, transparency and usefulness. Together, the qualitative framework and quantitative metrics form the basis for structured monitoring to ensure the WDI remains a premier repository of development data.
+
+# Quantitative Criteria
+
+The quantitative metrics used to monitor the WDI are defined below:
+
+Easy to Use
+
+  *	Metadata Availability: Does the indicator come with key metadata? At a minimum this includes a clear indicator name, description, definition, description of development relevance, measurement units, statistical concepts, methodology, aggregation method, data sources.     
+  * Open License: Are the data available with an open license, such as CC BY 4.0?   
+
+Trusted & Relevant
+
+  *	User Metrics: How often do users download or cite the data in a year?   
+
+Adequate Coverage
+
+  *	Number of economies: How many economies have data for the indicator?    
+  *	Percent of low- and middle-income economies: What percentage of low- and middle-income economies (LMICs) have available data, as these economies are core to the World Bank mission?    
+  *	Absolute most recent year: What is the most recent year for which data is available for the indicator?    
+  *	Median most recent year: What is the latest year of data available for the median country?    
+  *	Span of years: What are the total number of years for which data is available for the indicator, calculated as the difference between the first and last years with any available data?    
+  *	Non-missing data: How common are missing values in the time series? This metric measures the share of non-missing data within its availability. The span is restricted to the indicator span and country coverage previously calculated, and not the span and coverage of the WDI.  
+  
+# Monitoring the WDI
+
+The WDI contain a set of `r scales::comma(nrow(monitoring_data))` indicators. The table below provides a snapshot of the monitoring data as of `r stamp("March 1, 1999")(today())`, which includes the quantitative metrics for each indicator. 
+
+Table 2: Monitoring Data for the World Development Indicators
+
+
+```{r}
+#| label: tbl_monitoring-table
+#| tbl-cap: Monitoring Data for the World Development Indicators
+#| message: false
+
+sumstats <-  score_table %>%
+   #turn metadata_fail into a factor
+  mutate(
+    metadata_fail = factor(metadata_fail, levels = c("No missing metadata", "Development relevance missing", "Statistical concept and methodology missing", "License Type missing", "Definition missing", "Source missing"),
+  ),
+  #more concise definition of fail
+  metadata_fail_concise = case_when(
+    metadata_fail == "No missing metadata" ~ "No missing metadata",
+    TRUE ~ "Missing metadata field(s)"
+    )) %>%
+    select( metadata_fail_concise, License.Type, uniquevisitors, n_country, p_lmic, yearlatest_median, yearlatest, 
+           span_years, nonmiss) %>%
+  # replace Licence.Type with CC BY-4.0 if missing
+  mutate(License.Type = ifelse(is.na(License.Type), "CC BY-4.0", License.Type)) %>%
+  #rename columns
+  rename(
+    #"WDI Criteria Index Score (0-4)" = hybrid_score_wgtd,
+    "Number of Economies" = n_country,
+    "Percent of LMICs" = p_lmic,
+    "Most Recent Year (Median)" = yearlatest_median,
+    "Most Recent Year (Max)" = yearlatest,
+    "Non-missing Data (%)" = nonmiss,
+    "Span of Years" = span_years,
+    "Count of Unique Visitors past 12 months" = uniquevisitors,
+    #"Metadata Word Count" = metadata_length,
+    "Missing Metadata" = metadata_fail_concise,
+    "License Type" = License.Type
+  ) %>%
+    tbl_summary(
+      digits= starts_with("Most Recent Year") ~ list(as.character),
+      statistic = all_continuous() ~ "{median} ({min}, {max})"
+    ) %>%
+  modify_footnote(all_stat_cols() ~ "Median (Min, Max)") 
+  
+sumstats
+```
+
+The various quantitative metrics outlined above are combined into a composite index to provide an overall assessment of an indicator's suitability for inclusion in the WDI database. The index aggregates the performance of each indicator across the different criteria, allowing for a transparent and systematic evaluation process. The figure below shows the distribution of index scores across the current set of 1,484 WDI indicators. The index has a maximum score of 4 and a minimum score of 0, with higher scores indicating better performance across the criteria. 
+
+
+```{r}
+#| label: figure
+#| fig-cap: Indicator Scores for WDI Indicators
+#| fig-height: 5
+#| fig-width: 7
+
+#beeswarm plot
+metric_nm <- 'hybrid_score_wgtd'
+metric_des <- "WDI Scoring Metric"
+
+breakup_tab_mod_df <- score_table %>% 
+  mutate(name_flag="WDI Indicators") %>%
+  rename('metric'= !!metric_nm) %>%
+  group_by(name_flag) %>%
+  summarise(metric_mn=mean(metric, na.rm=TRUE),
+            metric_min=min(metric, na.rm=TRUE),
+            metric_max=max(metric, na.rm=TRUE),
+            indicator_min=Indicator.Name[which.min(metric)],
+            indicator_max=Indicator.Name[which.max(metric)],
+            ) %>%
+  #arrange(-metric_mn) %>%
+  transmute(
+    name_flag=name_flag,
+    metric=round(metric_mn,2),
+    min=round(metric_min,2),
+    indicator_min=indicator_min,
+    max=round(metric_max,2),
+    indicator_max=indicator_max
+  ) 
+
+p <- score_table %>% 
+  mutate(name_flag="WDI Indicators") %>%
+  rename('metric'= !!metric_nm) %>%
+  mutate(name_flag=factor(name_flag, levels=breakup_tab_mod_df$name_flag)) %>%
+  ggplot(aes(x=name_flag, y=metric, group=Indicator.Name)) +
+    geom_beeswarm(color='#457b9d', alpha=0.5) +
+    geom_segment(data=breakup_tab_mod_df, aes( xend=after_stat(x)+.3, yend=after_stat(y), group=""), color='black', size=1)  +
+    geom_segment(data=breakup_tab_mod_df, aes( xend=after_stat(x)-.3, yend=after_stat(y), group=""), color='black', size=1)  +
+    geom_text(data=breakup_tab_mod_df, aes(label=paste0("Mean: ",round(metric, 1)), group=""), vjust=-5.5, hjust=1.5, color='black', size=4) +
+    theme_bw() +
+    expand_limits(y=c(0,4)) +
+    xlab('Status') +
+    ylab(metric_des) +
+    coord_flip() +
+      labs(title='Indicator Scores for WDI Indicators',
+
+                   caption='Black lines represent the mean by status.')
+
+p
+
+```
+
+The table below provides a breakdown of the average indicator scores by theme, allowing for a more granular understanding of the performance of indicators across different areas. The table shows the average score, minimum score, and maximum score for each theme, along with the indicators with the lowest and highest scores within each theme.
+
+Table 3. WDI Indicator Scoring by Theme
+```{r}
+#| label: tbl_theme-breakup
+#| tbl-cap: Average Indicator Score by Theme
+
+# calcualte the mean score by theme
+
+
+metric_nm <- 'hybrid_score_wgtd'
+metric_des <- "Weighted Distant to Threshold Score"
+
+breakup_tab_df <- score_table %>%
+  #create a topic classification that drops all info past a : symbol in datatopic
+  mutate(
+    greater_topic= str_extract(datatopic, "^[^:]*"),
+  ) %>%
+  rename('metric'= !!metric_nm) %>%
+  group_by(greater_topic) %>%
+  summarise(metric_mn=mean(metric, na.rm=TRUE),
+            metric_min=min(metric, na.rm=TRUE),
+            metric_max=max(metric, na.rm=TRUE),
+            indicator_min=Indicator.Name[which.min(metric)],
+            indicator_max=Indicator.Name[which.max(metric)],
+            ) %>%
+  arrange(-metric_mn) %>%
+  transmute(
+    greater_topic=greater_topic,
+    metric=round(metric_mn,2),
+    min=round(metric_min,2),
+    indicator_min=indicator_min,
+    max=round(metric_max,2),
+    indicator_max=indicator_max
+  ) 
+
+flextable(breakup_tab_df) %>%
+  add_header_lines('Average Indicator Score by Theme') %>%
+  set_header_labels(
+    values=c(greater_topic='Topic',
+             metric=metric_des,
+             min="Min",
+             indicator_min= " ",
+             max="Max",
+             indicator_max=" ")
+  ) %>%
+  theme_vanilla() %>%
+  autofit()
+
+
+
+```
