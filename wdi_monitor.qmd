@@ -183,7 +183,7 @@ list(
 
 ```{r}
 #| content: valuebox
-#| title: "Indicators lacking open license"
+#| title: "Indicators lacking CC BY 4.0 license"
 
 list(
   icon = "cc-circle",
