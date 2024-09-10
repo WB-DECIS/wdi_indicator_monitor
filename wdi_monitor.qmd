@@ -5,10 +5,9 @@ format:
     scrolling: true
     nav-buttons: github
     github: "https://github.com/WB-DECIS/wdi_indicator_monitor"
+    theme:
+      - lumen
 logo: "images/WB-DEC-Data-horizontal-white-gradient-high.png"
-theme:
-- lumen
-- theme/custom.scss
 fig-width: 10
 fig-asp: 0.3
 params:
