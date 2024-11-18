@@ -173,6 +173,8 @@ time_color <- case_when(
 ```{r}
 #| content: valuebox
 #| title: "Indicators lacking required metadata"
+#| eval: false
+#| echo: false
 
 list(
   icon = "file-earmark-check",
