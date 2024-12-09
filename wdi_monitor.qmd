@@ -747,7 +747,7 @@ checkbox_filter_ctr <- function(name) {
 }
 
 reactable(
-  ctr_table,  # Correct dataset
+  ctr_table,  
   filterable = TRUE,
   columns = list(
     Indicator.Code = colDef(name = "Code"),
@@ -867,7 +867,7 @@ checkbox_filter_time <- function(name) {
 }
 
 reactable(
-  time_table,  # Use the correct dataset
+  time_table,  
   filterable = TRUE,
   columns = list(
     Indicator.Code = colDef(name = "Code"),
