@@ -12,6 +12,7 @@ fig-asp: 0.3
 params:
   database: World Development Indicators
   unit: DECDG
+
 resource_files:
 - manifest.json
 ---
@@ -28,21 +29,20 @@ library(gt)
 library(ggbeeswarm)
 library(plotly)
 library(downloadthis)
+library(reactable)
+library(htmltools)
 
 theme_set(theme_minimal(base_size = 24, base_family = "Andes Bold"))
 ```
-
-
 
 ```{r}
 #| label: load-data
 #| message: false
 
 monitoring_data <- read_csv("data/wdic.csv")
-score_table <- read_csv("data/indicators_scoretable.csv")
+score_table <- read_csv("data/indicators_scoretable.csv") 
+score_table <- mutate(score_table, across(contains("_score_hybrid"), ~ round(., 2)))
 ```
-
-
 
 ```{r}
 #| label: set-inputs
@@ -79,7 +79,7 @@ This dashboard displays <br/> statistics for:
 | **Years** | `{r} paste0(min_year, " - ", max_year)` |
 | **Countries** | `{r} n_countries` |
 
-<h3> Download the Data </h3>
+<!-- <h3> Download the Data </h3> -->
 
 ```{r}
 #download the data
@@ -87,13 +87,12 @@ score_table %>%
   download_this(
     output_name = "WDI Monitoring data set",
     output_extension = ".xlsx",
-    button_label = "Download data",
+    button_label = "Download indicator score",
     button_type = "warning",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
 ```
-
 
 # All
 
@@ -110,7 +109,7 @@ metadata_count <- score_table %>%
 #license count
 #count number of indicators failing on license
 license_count <- score_table %>% 
-  filter(License.Type != "CC BY-4.0") %>% 
+  filter(License.Type != "CC BY-4.0"|is.na(License.Type)) %>% 
   nrow()
 
 # low user count
@@ -132,107 +131,183 @@ time_count <- score_table %>%
   nrow()
 
 #set thresholds for color scoring of indicator counts
-# 0 indicators is green
+# 0 indicators is blue
 # 0-100 indicators is yellow
 # more than 100 indicators is red
+warning <- "#A79011"
+danger <-"#CA8181"
+light <- "#7B98AD"
+
 metadata_color <- case_when(
-  between(metadata_count, 0, 100) ~ "warning",
-  metadata_count > 100 ~ "danger",
-  .default = "light"
+  between(metadata_count, 0, 100) ~ warning,
+  metadata_count > 100 ~ danger,
+  .default = light
   )
 
 license_color <- case_when(
-  between(license_count, 0, 100) ~ "warning",
-  license_count > 100 ~ "danger",
-  .default = "light"
+  between(license_count, 0, 100) ~ warning,
+  license_count > 100 ~ danger,
+  .default = light
   )
 
 user_color <- case_when(
-  between(user_count, 0, 100) ~ "warning",
-  user_count > 100 ~ "danger",
-  .default = "light"
+  between(user_count, 0, 100) ~ warning,
+  user_count > 100 ~ danger,
+  .default = light
   )
 
 country_color <- case_when(
-  between(country_count, 0, 100) ~ "warning",
-  country_count > 100 ~ "danger",
-  .default = "light"
+  between(country_count, 0, 100) ~ warning,
+  country_count > 100 ~ danger,
+  .default = light
   )
 
 time_color <- case_when(
-  between(time_count, 0, 100) ~ "warning",
-  time_count > 100 ~ "danger",
-  .default = "light"
+  between(time_count, 0, 100) ~ warning,
+  time_count > 100 ~ danger,
+  .default = light
   )
 
+### Summary card style 
+card_style <- "text-decoration: none; color: inherit;"
+icon_style <- "display: block; margin-top:20px;  text-align: center"
+card_p_style <- "font-size: 18px;font-color: #ffffff; margin-top: 10px;text-align: left;line-height: 1.2;"
+card_b_style <- "font-size: 2.5rem; font-color: #ffffff; margin: 0; text-align: left;font-weight: normal;"
+
 ```
 
 
-## Row {height="350px}
-
+## Row {height="30%"}
 ```{r}
-#| content: valuebox
-#| title: "Indicators lacking required metadata"
-#| eval: false
-#| echo: false
+#| padding: 0px
 
-list(
-  icon = "file-earmark-check",
-  color = metadata_color,
-  value = metadata_count
+htmltools::div(
+  class = "custom-card",
+  style = paste0("background-color: ", metadata_color, "; color: white; padding: 20px;"),
+  htmltools::a(
+    href = "#metadata",
+    style = card_style,
+    htmltools::tags$i(
+      class = "bi bi-file-earmark-check fa-3x", 
+      style = icon_style
+    ),
+    htmltools::p(
+      "Indicators lacking required metadata",
+      style = card_p_style
+    ),
+    htmltools::h3(
+      metadata_count, 
+      style = card_b_style
+    )
+  )
 )
 ```
 
 ```{r}
-#| content: valuebox
-#| title: "Indicators lacking CC BY 4.0 license"
+#| padding: 0px
 
-list(
-  icon = "cc-circle",
-  color = license_color,
-  value = license_count
+htmltools::div(
+  class = "custom-card",
+  style = paste0("background-color: ", license_color, "; color: white; padding: 20px;"),
+  htmltools::a(
+    href = "#license",
+    style = card_style,
+    htmltools::tags$i(
+      class = "bi bi-cc-circle fa-3x", 
+      style = icon_style
+    ),
+    htmltools::p(
+      "Indicators lacking CC BY 4.0 license",
+      style = card_p_style
+    ),
+    htmltools::h3(
+      license_count, 
+      style = card_b_style
+    )
+  )
 )
 ```
 
 ```{r}
-#| content: valuebox
-#| title: "Indicators with less than 50 visitors last 12 months"
+#| padding: 0px
 
-list(
-  icon = "file-earmark-arrow-down",
-  color = user_color,
-  value = user_count
+htmltools::div(
+  class = "custom-card",
+  style = paste0("background-color: ", user_color, "; color: white; padding: 20px;"),
+  htmltools::a(
+    href = "#user-metrics",
+    style = card_style,
+    htmltools::tags$i(
+      class = "bi bi-file-earmark-arrow-down fa-3x", 
+      style = icon_style
+    ),
+    htmltools::p(
+      "Indicators with less than 50 visitors last 12 months",
+      style = card_p_style
+    ),
+    htmltools::h3(
+      user_count, 
+      style = card_b_style
+    )
+  )
+)
+```
+
+
+```{r}
+#| padding: 0px
+
+htmltools::div(
+  class = "custom-card",
+  style = paste0("background-color: ", country_color, "; color: white; padding: 20px;"),
+  htmltools::a(
+    href = "#country-coverage",
+    style = card_style,
+    htmltools::tags$i(
+      class = "bi bi-globe fa-3x", 
+      style = icon_style
+    ),
+    htmltools::p(
+      "Indicators with poor country coverage (under 50 countries)",
+      style = card_p_style
+    ),
+    htmltools::h3(
+      country_count, 
+      style = card_b_style
+    )
+  )
 )
 ```
 
 ```{r}
-#| content: valuebox
-#| title: "Indicators with poor country coverage (under 50 countries)"
+#| padding: 0px
 
-list(
-  icon = "globe",
-  color = country_color,
-  value = country_count
+htmltools::div(
+  class = "custom-card",
+  style = paste0("background-color: ", time_color, "; color: white; padding: 20px;"),
+  htmltools::a(
+    href = "#time-coverage",
+    style = card_style,
+    htmltools::tags$i(
+      class = "bi bi-calendar-check fa-3x", 
+      style = icon_style
+    ),
+    htmltools::p(
+      "Indicators with no data in last 10 years",
+      style = card_p_style
+    ),
+    htmltools::h3(
+      time_count, 
+      style = card_b_style
+    )
+  )
 )
 ```
 
-```{r}
-#| content: valuebox
-#| title: "Indicators with no data in last 10 years"
-
-list(
-  icon = "calendar-check",
-  color = time_color,
-  value = time_count
-)
-```
-
-## Row {.tabset height="65%"}
-
+## Row {height="70%"}
 
 ```{r}
-#| title: Figure
-
+##| title: Figure
 
 #beeswarm plot
 metric_nm <- 'hybrid_score_wgtd'
@@ -280,248 +355,574 @@ ggplotly(p)
 
 ```
 
-
-
-
-```{r}
-#| title: Table
-#conver to a table using the gt package
- score_table %>%
-    select(Indicator.Code, Indicator.Name, hybrid_score_wgtd, n_country, p_lmic, yearlatest_median, yearlatest, nonmiss, 
-           span_years, uniquevisitors,metadata_availability, metadata_length, License.Type,  datatopic) %>%
-      arrange(hybrid_score_wgtd) %>%
-  gt() %>%
-  tab_header(
-    title = "Indicator Overview",
-    subtitle = "Summary of WDI Indicators"
-  ) %>%
-  fmt_number(
-    columns = c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'),
-    decimals = 2
-  ) %>%
-  fmt_date(
-    columns = c('yearlatest_median', 'yearlatest'),
-  ) %>%
-  fmt_number(
-    columns = c('span_years', 'uniquevisitors'),
-    use_seps = TRUE
-  ) %>%
-  #add span
-  tab_spanner(
-    label = "Metadata",
-    columns = c('metadata_availability', 'metadata_length')
-  ) %>%
-  tab_spanner(
-    label = "Time",
-    columns = c('yearlatest_median', 'yearlatest', 'span_years', 'nonmiss')
-  ) %>%
-  tab_spanner(
-    label = "Country",
-    columns = c('n_country', 'p_lmic')
-  ) %>%
-  #rename columns
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    hybrid_score_wgtd = "Score",
-    n_country = "Countries",
-    p_lmic = "LMIC (%)",
-    yearlatest_median = "Latest Year (Median)",
-    yearlatest = "Latest Year (Max)",
-    nonmiss = "Non-missing data (%)",
-    span_years = "Years Spanned",
-    uniquevisitors = "Unique visitors",
-    metadata_availability = "Metadata Availability",
-    metadata_length = "Metadata Length",
-    License.Type = "License",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
-  )
-```
-
-
 # Metadata
 
 To help users understand the data, a set of key metadata fields need to be in place. At a minimum this includes a clear indicator name, description, definition, description of development relevance,  statistical concepts, methodology, data sources. 
 
+- To display only the indicators missing required metadata fields, select the checkbox under the **'Missing Key Metadata Field'** column.
+
+- Indicators with a score below 2 are highlighted. For a detailed explanation of the methodology, refer to the [Quantitative Scoring](#quantitative-scoring) section.
 
 ```{r}
 #| title: Metadata Table
- score_table %>%
-    select(Indicator.Code, Indicator.Name, metadata_fail, metadata_length, Development.relevance, Statistical.concept.and.methodology, License.Type, Short.definition, Long.definition, Source,  datatopic) %>%
-      arrange(metadata_length) %>%
-  gt() %>%
-  tab_header(
-    title = "Metadata Overview",
-    subtitle = "Summary of WDI Indicators"
-  ) %>%
-  fmt_number(
-    columns = c('metadata_length'),
-    decimals = 0
-  ) %>%
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    metadata_fail = "Metadata Availability",
-    metadata_length = "Metadata Length",
-    Development.relevance = "Development Relevance",
-    Statistical.concept.and.methodology = "Statistical Concept and Methodology",
-    License.Type = "License",
-    Short.definition = "Short Definition",
-    Long.definition = "Long Definition",
-    Source = "Source",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
-  )
 
+meta_table <- select(score_table, Indicator.Code, Indicator.Name, metadata_score_hybrid, metadata_fail, metadata_length, Development.relevance, Statistical.concept.and.methodology, License.Type, Short.definition, Long.definition, Source,datatopic) 
+
+# Function for select input filter
+filter_fct <- function(values, name) {
+  tags$select(
+    tags$option(value = "", "All"),
+    purrr::map(unique(values), tags$option),
+    onchange = glue::glue(
+      "Reactable.setFilter(
+        'meta-tbl', 
+        '{name}', 
+        event.target.value  
+      )"
+    ),
+    style = "width: 100%;"
+  )
+}
+
+filter_range <- function(values, name) {
+  oninput <- sprintf("Reactable.setFilter('meta-tbl', '%s', this.value)", name)
+  tags$input(
+    type = "range",
+    min = floor(min(values, na.rm = TRUE)),  # Handle NA values
+    max = ceiling(max(values, na.rm = TRUE)),  # Handle NA values
+    value = floor(min(values, na.rm = TRUE)),
+    oninput = oninput,
+    onchange = oninput,
+    "aria-label" = sprintf("Filter by minimum %s", name),
+    style = "width: 100%;"
+  )
+}
+
+checkbox_filter_meta <- function(name) {
+  tags$label(
+    style = "display: block; margin-bottom: 10px;",
+    tags$input(
+      type = "checkbox",
+      id = paste0(name, "-checkbox"),
+      onchange = glue::glue(
+        "Reactable.setFilter(
+          'meta-tbl',
+          '{name}',
+          this.checked ? 'filter' : undefined
+        )"
+      ),
+      style = "margin-right: 5px;"
+    ),
+    "Only show indicators lacking key metadata"
+  )
+}
+
+reactable(
+  meta_table,
+  filterable = TRUE,
+  columns = list(
+    Indicator.Code = colDef(name = "Code"),
+    Indicator.Name = colDef(name = "Name"),
+    metadata_length = colDef(name = "Metadata Length"),
+    Development.relevance = colDef(name = "Development Relevance"),
+    Statistical.concept.and.methodology = colDef(name = "Statistical Concept and Methodology"),
+    License.Type = colDef(name = "License"),
+    Short.definition = colDef(name = "Short Definition"),
+    Long.definition = colDef(name = "Long Definition"),
+    Source = colDef(name = "Source"),
+    metadata_fail = colDef(
+      name = "Missing key Metadata Field",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, value) {
+          if (value === 'filter') {
+            return rows.filter(function(row) {
+              return row.values[columnId] != null && row.values[columnId] !== 'No missing metadata';
+            });
+          } else {
+            return rows;
+          }
+        }
+      "),
+      filterInput = checkbox_filter_meta("metadata_fail")
+    ),
+    datatopic = colDef(
+      name = "Topic",
+      filterInput = filter_fct
+    ),
+    metadata_score_hybrid = colDef(
+      name = "Metadata Score",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, filterValue) {
+          return rows.filter(function(row) {
+            return row.values[columnId] != null && row.values[columnId] >= filterValue;
+          });
+        }
+      "),
+      filterInput = filter_range,
+      style = function(value) {
+        if (is.na(value)) {
+          NULL  # Do nothing for NA
+        } else if (value < 2) {
+          list(background = danger, color = "white") # Warning color
+        } else {
+          NULL
+        }
+      }
+    )
+  ),
+  defaultPageSize = 10,
+  elementId = "meta-tbl"
+)
 
 ```
-
 
 # License
 
 Data should be open and free to use. The World Bank has adopted the Creative Commons Attribution 4.0 International License (CC BY 4.0) for all its data. This license allows users to copy, distribute, transmit, and adapt the data, provided the source is appropriately cited.
 
+- To display only the indicators lacking CC BY 4.0 license, select the checkbox under the **License** column.
+
 ```{r}
-#| title: License Table
- score_table %>%
+license_table <-  score_table %>%
     select(Indicator.Code, Indicator.Name,  License.Type, Source,  datatopic) %>%
-      arrange(License.Type) %>%
-  gt() %>%
-  tab_header(
-    title = "License Overview",
-    subtitle = "Summary of WDI Indicators"
-  ) %>%
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    License.Type = "License",
-    Source = "Source",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
+      arrange(License.Type)
+
+# Function for select input filter
+checkbox_filter_license <- function(name) {
+  tags$label(
+    style = "display: block; margin-bottom: 10px;",
+    tags$input(
+      type = "checkbox",
+      id = paste0(name, "-checkbox"),
+      onchange = glue::glue(
+        "Reactable.setFilter(
+          'license-tbl',
+          '{name}',
+          this.checked ? 'filter' : undefined
+        )"
+      ),
+      style = "margin-right: 5px;"
+    ),
+    "Only show indicators lacking CC BY 4.0"
   )
-    
-    
+}
+
+filter_fct_license <- function(values, name) {
+  tags$select(
+    tags$option(value = "", "All"),
+    purrr::map(unique(values), tags$option),
+    onchange = glue::glue(
+      "Reactable.setFilter(
+        'license-tbl', 
+        '{name}', 
+        event.target.value  
+      )"
+    ),
+    style = "width: 100%;"
+  )
+}
+
+reactable(
+  license_table,
+  filterable = TRUE,
+  columns = list(
+    Indicator.Code = colDef(name = "Code"),
+    Indicator.Name = colDef(name = "Name"),
+    Source = colDef(name = "Source"),
+    datatopic = colDef(
+      name = "Topic",
+      filterInput = filter_fct_license
+    ),
+    License.Type = colDef(
+      name = "License",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, value) {
+          if (value === 'filter') {
+            return rows.filter(function(row) {
+              return row.values[columnId] !== 'CC BY-4.0';
+            });
+          } else {
+            return rows;
+          }
+        }
+      "),
+      filterInput = checkbox_filter_license("License.Type")
+    )
+  ),
+  defaultPageSize = 10,
+  elementId = "license-tbl"
+)
 ```
 
 # User Metrics
 
 The number of unique visitors to an indicator is a key metric to understand the usage of the indicator. This metric is calculated using the Adobe Analytics platform.
 
+- To display only the indicators with less than 50 visitors last 12 months, select the checkbox under the **'Visitors'** column.
+
+- Indicators with a score below 2 are highlighted. For a detailed explanation of the methodology, refer to the [Quantitative Scoring](#quantitative-scoring) section.
+
 ```{r}
 #| title: User Table
 
-score_table %>%
-    select(Indicator.Code, Indicator.Name, uniquevisitors, pageviews, datatopic) %>%
-      arrange(desc(uniquevisitors)) %>%
-  gt() %>%
-  tab_header(
-    title = "User Metrics",
-    subtitle = "Summary of WDI Indicators"
+user_table <- score_table %>%
+  select(
+    Indicator.Code, 
+    Indicator.Name, 
+    uniquevisitors_score_hybrid, 
+    visitors, 
+    uniquevisitors, 
+    pageviews, 
+    datatopic
   ) %>%
-  fmt_number(
-    columns = c('uniquevisitors', 'pageviews'),
-    use_seps = TRUE
-  ) %>%
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    uniquevisitors = "Unique Visitors",
-    pageviews = "Page Views",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
+  arrange(desc(uniquevisitors))
+
+# Function for select input filter
+filter_fct_user <- function(values, name) {
+  tags$select(
+    tags$option(value = "", "All"),
+    purrr::map(unique(values), tags$option),
+    onchange = glue::glue(
+      "Reactable.setFilter(
+        'user-tbl', 
+        '{name}', 
+        event.target.value  
+      )"
+    ),
+    style = "width: 100%;"
   )
-  
+}
+
+filter_range_user <- function(values, name) {
+  oninput <- sprintf("Reactable.setFilter('user-tbl', '%s', this.value)", name)
+  tags$input(
+    type = "range",
+    min = floor(min(values, na.rm = TRUE)),  
+    max = ceiling(max(values, na.rm = TRUE)),  
+    value = floor(min(values, na.rm = TRUE)),
+    oninput = oninput,
+    onchange = oninput,
+    "aria-label" = sprintf("Filter by minimum %s", name),
+    style = "width: 100%;"
+  )
+}
+
+checkbox_filter_user <- function(name) {
+  tags$label(
+    style = "display: block; margin-bottom: 10px;",
+    tags$input(
+      type = "checkbox",
+      id = paste0(name, "-checkbox"),
+      onchange = glue::glue(
+        "Reactable.setFilter(
+          'user-tbl',
+          '{name}',
+          this.checked ? 'filter' : undefined
+        )"
+      ),
+      style = "margin-right: 5px;"
+    ),
+    "Only show indicators with less than 50 visitors last 12 months"
+  )
+}
+
+reactable(
+  user_table,
+  filterable = TRUE,
+  columns = list(
+    Indicator.Code = colDef(name = "Code"),
+    Indicator.Name = colDef(name = "Name"),
+    visitors = colDef(
+      name = "Visitors",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, value) {
+          if (value === 'filter') {
+            return rows.filter(function(row) {
+              return row.values[columnId] != null && row.values[columnId] < 50;
+            });
+          } else {
+            return rows;
+          }
+        }
+      "),
+      filterInput = checkbox_filter_user("visitors")
+    ),
+    uniquevisitors = colDef(name = "Unique Visitors"),
+    pageviews = colDef(name = "Page Views"),
+    datatopic = colDef(
+      name = "Topic",
+      filterInput = filter_fct_user
+    ),
+    uniquevisitors_score_hybrid = colDef(
+      name = "Unique visitors Score",
+      filterable = TRUE,
+      filterMethod = JS("function(rows, columnId, filterValue) {
+        return rows.filter(function(row) {
+          return row.values[columnId] != null && row.values[columnId] >= filterValue;
+        });
+      }"),
+      filterInput = filter_range_user,
+      style = function(value) {
+        if (is.na(value)) {
+          NULL  
+        } else if (value < 2) {
+          list(background = danger, color = "white")  # Warning color
+        } else {
+          NULL
+        }
+      }
+    )
+  ),
+  defaultPageSize = 10,
+  elementId = "user-tbl"
+)
+
 ```
 
 # Country Coverage
 
 The number of countries for which data is available is a key metric to understand the geographical coverage of the indicator.
 
+- To display only the indicators with poor country coverage (under 50 countries), select the checkbox under the **'Number of Countries'** column.
+
+- Indicators with a score below 2 are highlighted. For a detailed explanation of the methodology, refer to the [Quantitative Scoring](#quantitative-scoring) section.
+
 ```{r}
 #| title: Country Coverage Table
 
+ctr_table <- select(score_table, Indicator.Code, Indicator.Name, geographic_score_hybrid, n_country, n_lmic, p_lmic, datatopic) %>%
+      arrange(desc(n_country))
 
- score_table %>%
-    select(Indicator.Code, Indicator.Name,  n_country, n_lmic, p_lmic,  datatopic) %>%
-      arrange(desc(n_country)) %>%
-  gt() %>%
-  tab_header(
-    title = "Country Coverage",
-    subtitle = "Summary of WDI Indicators"
-  ) %>%
-  fmt_number(
-    columns = c('n_country', 'n_lmic', 'p_lmic'),
-    decimals = 0
-  ) %>%
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    n_country = "Number of Countries",
-    n_lmic = "Number of LMICs",
-    p_lmic = "Percent of LMICs",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
+# Function for select input filter
+filter_fct_ctr <- function(values, name) {
+  tags$select(
+    tags$option(value = "", "All"),
+    purrr::map(unique(values), tags$option),
+    onchange = glue::glue(
+      "Reactable.setFilter(
+        'ctr-tbl', 
+        '{name}', 
+        event.target.value  
+      )"
+    ),
+    style = "width: 100%;"
   )
-  
+}
+
+filter_range_ctr <- function(values, name) {
+  oninput <- sprintf("Reactable.setFilter('ctr-tbl', '%s', this.value)", name)
+  tags$input(
+    type = "range",
+    min = floor(min(values, na.rm = TRUE)),  # Handle NA values
+    max = ceiling(max(values, na.rm = TRUE)),  # Handle NA values
+    value = floor(min(values, na.rm = TRUE)),
+    oninput = oninput,
+    onchange = oninput,
+    "aria-label" = sprintf("Filter by minimum %s", name),
+    style = "width: 100%;"
+  )
+}
+
+checkbox_filter_ctr <- function(name) {
+  tags$label(
+    style = "display: block; margin-bottom: 10px;",
+    tags$input(
+      type = "checkbox",
+      id = paste0(name, "-checkbox"),
+      onchange = glue::glue(
+        "Reactable.setFilter(
+          'ctr-tbl',
+          '{name}',
+          this.checked ? 'filter' : undefined
+        )"
+      ),
+      style = "margin-right: 5px;"
+    ),
+    "Only show indicators with fewer than 50 countries"
+  )
+}
+
+reactable(
+  ctr_table,  # Correct dataset
+  filterable = TRUE,
+  columns = list(
+    Indicator.Code = colDef(name = "Code"),
+    Indicator.Name = colDef(name = "Name"),
+    n_lmic = colDef(name = "Number of LMICs"),
+    p_lmic = colDef(name = "Percent of LMICs"),
+    n_country = colDef(
+      name = "Number of Countries",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, value) {
+          if (value === 'filter') {
+            return rows.filter(function(row) {
+              return row.values[columnId] != null && row.values[columnId] < 50;
+            });
+          } else {
+            return rows;
+          }
+        }
+      "),
+      filterInput = checkbox_filter_ctr("n_country")
+    ),
+    datatopic = colDef(
+      name = "Topic",
+      filterInput = filter_fct_ctr
+    ),
+    geographic_score_hybrid = colDef(
+      name = "Geographical Coverage Score",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, filterValue) {
+          return rows.filter(function(row) {
+            return row.values[columnId] != null && row.values[columnId] >= filterValue;
+          });
+        }
+      "),
+      filterInput = filter_range_ctr,
+      style = function(value) {
+        if (is.na(value)) {
+          NULL  
+        } else if (value < 2) {
+          list(background = danger, color = "white")  # Warning color
+        } else {
+          NULL
+        }
+      }
+    )
+  ),
+  defaultPageSize = 10,
+  elementId = "ctr-tbl"
+)
+
 ```
 
 # Time Coverage
 
 An indicator should have recent data available and the indicator should ideally be updated as frequently as possible.
 
-```{r}
+- To display only the indicators with no data in the last 10 years, select the checkbox under the **'Latest Year'** column.
 
+- Indicators with a score below 2 are highlighted. For a detailed explanation of the methodology, refer to the [Quantitative Scoring](#quantitative-scoring) section.
+
+```{r}
 #| title: Time Coverage Table
 
+time_table <- select(score_table, Indicator.Code, Indicator.Name, temporal_score_hybrid, yearlatest, yearlatest_median, span_years, nonmiss, datatopic) %>%
+      arrange(desc(yearlatest))
 
- score_table %>%
-    select(Indicator.Code, Indicator.Name,  yearlatest, yearlatest_median, span_years, nonmiss,  datatopic) %>%
-      arrange(desc(yearlatest)) %>%
-  gt() %>%
-  tab_header(
-    title = "Time Coverage",
-    subtitle = "Summary of WDI Indicators"
-  ) %>%
-  fmt_date(
-    columns = c('yearlatest', 'yearlatest_median', 'span_years', 'nonmiss')
-  ) %>%
-  cols_label(
-    Indicator.Code = "Code",
-    Indicator.Name = "Name",
-    yearlatest = "Latest Year",
-    yearlatest_median = "Median Latest Year",
-    span_years = "Span of Years",
-    nonmiss = "Share of Non-missing Data",
-    datatopic = "Topic"
-  )  |>
-  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
-  opt_interactive(
-    use_search=TRUE,
-    use_filters=TRUE
+# Function for select input filter
+filter_fct_time <- function(values, name) {
+  tags$select(
+    tags$option(value = "", "All"),
+    purrr::map(unique(values), tags$option),
+    onchange = glue::glue(
+      "Reactable.setFilter(
+        'time-tbl', 
+        '{name}', 
+        event.target.value  
+      )"
+    ),
+    style = "width: 100%;"
   )
-    
-    
+}
+
+filter_range_time <- function(values, name) {
+  oninput <- sprintf("Reactable.setFilter('time-tbl', '%s', this.value)", name)
+  tags$input(
+    type = "range",
+    min = floor(min(values, na.rm = TRUE)),  # Handle NA values
+    max = ceiling(max(values, na.rm = TRUE)),  # Handle NA values
+    value = floor(min(values, na.rm = TRUE)),
+    oninput = oninput,
+    onchange = oninput,
+    "aria-label" = sprintf("Filter by minimum %s", name),
+    style = "width: 100%;"
+  )
+}
+
+# Define checkbox filter for time
+checkbox_filter_time <- function(name) {
+  tags$label(
+    style = "display: block; margin-bottom: 10px;",
+    tags$input(
+      type = "checkbox",
+      id = paste0(name, "-checkbox"),
+      onchange = glue::glue(
+        "Reactable.setFilter(
+          'time-tbl',
+          '{name}',
+          this.checked ? 'filter' : undefined
+        )"
+      ),
+      style = "margin-right: 5px;"
+    ),
+    "Only show indicators with no data in the last 10 years"
+  )
+}
+
+reactable(
+  time_table,  # Use the correct dataset
+  filterable = TRUE,
+  columns = list(
+    Indicator.Code = colDef(name = "Code"),
+    Indicator.Name = colDef(name = "Name"),
+    yearlatest = colDef(
+      name = "Latest Year",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, value) {
+          if (value === 'filter') {
+            const cutoffYear = new Date().getFullYear() - 10;
+            return rows.filter(function(row) {
+              return row.values[columnId] < cutoffYear;
+            });
+          } else {
+            return rows;
+          }
+        }
+      "),
+      filterInput = checkbox_filter_time("yearlatest")
+    ),
+    yearlatest_median = colDef(name = "Median Latest Year"),
+    span_years = colDef(name = "Span of Years"),
+    nonmiss = colDef(name = "Share of Non-missing Data"),
+    datatopic = colDef(
+      name = "Topic",
+      filterInput = filter_fct_time
+    ),
+    temporal_score_hybrid = colDef(
+      name = "Temporal Coverage Score",
+      filterable = TRUE,
+      filterMethod = JS("
+        function(rows, columnId, filterValue) {
+          return rows.filter(function(row) {
+            return row.values[columnId] != null && row.values[columnId] >= filterValue;
+          });
+        }
+      "),
+      filterInput = filter_range_time,
+      style = function(value) {
+        if (is.na(value)) {
+          NULL  
+        } else if (value < 2) {
+          list(background = danger, color = "white")  # Warning color
+        } else {
+          NULL
+        }
+      }
+    )
+  ),
+  defaultPageSize = 10,
+  elementId = "time-tbl"
+)
+
+
 ```
 # Quantitative Scoring
 
@@ -637,3 +1038,63 @@ The result of this scoring is that each indicator has a 0-4 score along all 9 of
 
 An overall score is then computed by taking the weighted average the scores across the 9 metrics with higher scores meaning the indicator performs better on average across the nine metrics. The scores are produced using the nested structure described above with five categories: Geographic Coverage, Temporal Coverage, Completeness, Usage. The weights are 1/5 to indicators grouped in the Geographic Coverage category, 1/5 to Temporal Coverage, 1/5 to Completeness, 1/5 to Usage, and 1/5 to metadata quality. Within each category, the category scores are produced taking the unweighted average of metrics in that category.
 
+
+```{r}
+#| title: Table
+#conver to a table using the gt package
+ score_table %>%
+    select(Indicator.Code, Indicator.Name, hybrid_score_wgtd, n_country, p_lmic, yearlatest_median, yearlatest, nonmiss, 
+           span_years, uniquevisitors,metadata_availability, metadata_length, License.Type,  datatopic) %>%
+      arrange(hybrid_score_wgtd) %>%
+  gt() %>%
+  tab_header(
+    title = "Indicator Overview",
+    subtitle = "Summary of WDI Indicators"
+  ) %>%
+  fmt_number(
+    columns = c('n_country', 'p_lmic', 'nonmiss', 'hybrid_score_wgtd'),
+    decimals = 2
+  ) %>%
+  fmt_date(
+    columns = c('yearlatest_median', 'yearlatest'),
+  ) %>%
+  fmt_number(
+    columns = c('span_years', 'uniquevisitors'),
+    use_seps = TRUE
+  ) %>%
+  #add span
+  tab_spanner(
+    label = "Metadata",
+    columns = c('metadata_availability', 'metadata_length')
+  ) %>%
+  tab_spanner(
+    label = "Time",
+    columns = c('yearlatest_median', 'yearlatest', 'span_years', 'nonmiss')
+  ) %>%
+  tab_spanner(
+    label = "Country",
+    columns = c('n_country', 'p_lmic')
+  ) %>%
+  #rename columns
+  cols_label(
+    Indicator.Code = "Code",
+    Indicator.Name = "Name",
+    hybrid_score_wgtd = "Score",
+    n_country = "Countries",
+    p_lmic = "LMIC (%)",
+    yearlatest_median = "Latest Year (Median)",
+    yearlatest = "Latest Year (Max)",
+    nonmiss = "Non-missing data (%)",
+    span_years = "Years Spanned",
+    uniquevisitors = "Unique visitors",
+    metadata_availability = "Metadata Availability",
+    metadata_length = "Metadata Length",
+    License.Type = "License",
+    datatopic = "Topic"
+  )  |>
+  tab_source_note(source_note = md("Data from the World Development Indicators.")) |>
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+```
